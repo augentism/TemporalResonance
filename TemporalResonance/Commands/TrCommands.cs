@@ -23,6 +23,9 @@ public class TrCommands
     /// Value fed to the debug-poll sampler; null = source unavailable.
     public float? DebugPollValue { get; private set; }
 
+    /// Set by the ModSystem; opens/toggles the settings dialog.
+    public Action? OpenGui { get; init; }
+
     public TrCommands(ICoreClientAPI capi, ButtplugManager devices, PatternPlayer player,
                       PresetStore store, HookRegistry hooks, Dispatcher dispatcher)
     {
@@ -116,6 +119,14 @@ public class TrCommands
             {
                 dispatcher.Reset();
                 return TextCommandResult.Success("Panic: all devices stopped, dispatcher reset.");
+            })
+        .EndSubCommand()
+        .BeginSubCommand("gui")
+            .WithDescription("Open the settings dialog (also bound to a hotkey, default O)")
+            .HandleWith(_ =>
+            {
+                OpenGui?.Invoke();
+                return TextCommandResult.Success();
             })
         .EndSubCommand()
         .BeginSubCommand("status")

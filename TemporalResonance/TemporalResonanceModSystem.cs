@@ -19,6 +19,7 @@ public class TemporalResonanceModSystem : ModSystem
     HookRegistry hooks = null!;
     Dispatcher dispatcher = null!;
     TrCommands commands = null!;
+    TrGuiDialog gui = null!;
     Harmony? harmony;
 
     // Talks to Intiface Central on the player's machine — client side only
@@ -37,7 +38,12 @@ public class TemporalResonanceModSystem : ModSystem
         player = new PatternPlayer(api, devices);
         hooks = new HookRegistry();
         dispatcher = new Dispatcher(api, hooks, devices, player, store);
-        commands = new TrCommands(api, devices, player, store, hooks, dispatcher);
+        gui = new TrGuiDialog(api, devices, player, store, hooks, dispatcher);
+        api.Input.RegisterHotKey(TrGuiDialog.ToggleHotkey, "Temporal Resonance settings",
+            GlKeys.O, HotkeyType.GUIOrOtherControls);
+        api.Input.SetHotKeyHandler(TrGuiDialog.ToggleHotkey, _ => ToggleGui());
+
+        commands = new TrCommands(api, devices, player, store, hooks, dispatcher) { OpenGui = () => ToggleGui() };
         commands.Register();
 
         RegisterDebugHooks();
@@ -72,6 +78,12 @@ public class TemporalResonanceModSystem : ModSystem
             PollIntervalSec = 0.5,
             Sampler = () => commands.DebugPollValue
         });
+    }
+
+    bool ToggleGui()
+    {
+        if (gui.IsOpened()) gui.TryClose(); else gui.TryOpen();
+        return true;
     }
 
     /// Real game hooks: register the descriptor, then apply the Harmony
