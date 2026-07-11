@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CakeBuild", "CakeBuild\CakeBuild.csproj", "{2E717E2B-3557-4490-971B-842F0D02C1C5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TemporalResonance", "TemporalResonance\TemporalResonance.csproj", "{9E189DB0-0E01-41DF-A8A0-0543596D7F6E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2E717E2B-3557-4490-971B-842F0D02C1C5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2E717E2B-3557-4490-971B-842F0D02C1C5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2E717E2B-3557-4490-971B-842F0D02C1C5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2E717E2B-3557-4490-971B-842F0D02C1C5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9E189DB0-0E01-41DF-A8A0-0543596D7F6E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9E189DB0-0E01-41DF-A8A0-0543596D7F6E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9E189DB0-0E01-41DF-A8A0-0543596D7F6E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9E189DB0-0E01-41DF-A8A0-0543596D7F6E}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
