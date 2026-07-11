@@ -100,7 +100,7 @@ public class TrGuiDialog : GuiDialog
             CairoFont.WhiteSmallishText(), Row(w - 305));
         composer.AddSmallButton(devices.Connected ? "Disconnect" : "Connect", OnConnectToggle, Row(100, w - 300));
         composer.AddSmallButton("Scan", OnScan, Row(80, w - 195));
-        composer.AddSmallButton("Panic stop", () => { dispatcher.Reset(); return true; }, Row(105, w - 110));
+        composer.AddSmallButton("Panic stop", () => { dispatcher.Panic(); return true; }, Row(105, w - 110));
         y += rowH + gap;
 
         // ---- Assignment section ----

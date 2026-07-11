@@ -18,6 +18,7 @@ public class Dispatcher
 {
     const long GlobalMinGapMs = 100;
     const float ChangeEpsilon = 0.03f;
+    const long PanicSuppressMs = 20_000;
 
     readonly ICoreClientAPI capi;
     readonly HookRegistry hooks;
@@ -28,9 +29,13 @@ public class Dispatcher
     readonly Dictionary<string, long> lastFireMs = new();
     /// Last scale actually SENT (not last observed) — the epsilon gate compares against this.
     readonly Dictionary<string, float> lastScale = new();
+    /// Last scale OBSERVED per poll hook, even if gated — used to proactively
+    /// re-assert a poll the moment an event hold expires.
+    readonly Dictionary<string, float> lastObserved = new();
     readonly Dictionary<string, long> holdUntilMs = new();   // deviceKey -> claimed until
     readonly HashSet<string> pendingReassert = new();        // hookIds owed a re-send after a hold
     long lastAnyFireMs;
+    long suppressUntilMs;                                    // panic window: no dispatches at all
 
     public Dispatcher(ICoreClientAPI capi, HookRegistry hooks, ButtplugManager devices,
                       PatternPlayer player, PresetStore store)
@@ -47,8 +52,19 @@ public class Dispatcher
         var hook = hooks.Get(hookId);
         if (hook == null) return;
 
-        var isPoll = scale != null;
+        // Poll/event is decided by the hook's registered kind, not by whether
+        // a scale was passed — events may carry a scale too (e.g. footstep
+        // loudness) and it must not buy them poll semantics.
+        var isPoll = hook.Kind == HookKind.Poll;
+        if (isPoll && scale == null) return;
         var now = Now();
+
+        // Panic window: drop EVERYTHING, polls and events alike — the user hit
+        // panic because they want silence, and a poll's next sample would
+        // otherwise undo the stop within one interval.
+        if (now < suppressUntilMs) return;
+
+        if (isPoll) lastObserved[hookId] = scale!.Value;
 
         // 1. Per-hook cooldown.
         if (lastFireMs.TryGetValue(hookId, out var last) && (now - last) < hook.CooldownSec * 1000) return;
@@ -100,6 +116,8 @@ public class Dispatcher
         foreach (var group in targets.GroupBy(t => (t.preset.Id, t.inverted)))
         {
             var inverted = group.Key.inverted;
+            // Events: optional scale multiplies intensity (default full).
+            // Polls: scale is the level, inversion may flip it.
             var effScale = scale == null ? 1.0 : (inverted ? 1 - scale.Value : scale.Value);
             foreach (var (dev, preset, _) in group)
             {
@@ -118,7 +136,11 @@ public class Dispatcher
                 if (!isPoll)
                 {
                     if (preset.DurationSec > 0)
-                        holdUntilMs[dev.Key] = now + (long)(preset.DurationSec * 1000);
+                    {
+                        var holdUntil = now + (long)(preset.DurationSec * 1000);
+                        holdUntilMs[dev.Key] = holdUntil;
+                        ScheduleHoldExpiryReassert(dev.Key, holdUntil);
+                    }
 
                     foreach (var pollHook in hooks.All)
                     {
@@ -139,6 +161,31 @@ public class Dispatcher
     }
 
     /// <summary>
+    /// Re-assert affected polls the moment a hold expires instead of waiting
+    /// for their next natural sample (which lags by up to the poll interval).
+    /// The callback no-ops if a newer burst replaced this hold in the meantime
+    /// — that burst scheduled its own expiry callback.
+    /// </summary>
+    void ScheduleHoldExpiryReassert(string deviceKey, long holdUntil)
+    {
+        capi.Event.RegisterCallback(_ =>
+        {
+            if (!holdUntilMs.TryGetValue(deviceKey, out var current) || current != holdUntil) return;
+            holdUntilMs.Remove(deviceKey);
+
+            foreach (var pollHook in hooks.All)
+            {
+                if (pollHook.Kind != HookKind.Poll) continue;
+                if (!store.AssignmentsFor(pollHook.Id).ContainsKey(deviceKey)) continue;
+                if (!lastObserved.TryGetValue(pollHook.Id, out var value)) continue;
+
+                pendingReassert.Add(pollHook.Id);
+                Dispatch(pollHook.Id, value);
+            }
+        }, (int)Math.Max(1, holdUntil - Now()) + 50);
+    }
+
+    /// <summary>
     /// Zero only this hook's output: re-play its assigned presets at scale 0 on
     /// its connected assigned devices. Deliberately not a device-wide stop —
     /// other hooks driving the same device are untouched. No-op unless the
@@ -156,15 +203,27 @@ public class Dispatcher
             player.Play(dev, preset, 0);
         }
         lastScale.Remove(hookId);
+        lastObserved.Remove(hookId); // don't resurrect a stopped source at hold expiry
         pendingReassert.Remove(hookId);
     }
 
+    /// User-facing panic: full reset plus a suppression window so polls can't
+    /// re-assert themselves one sample later and undo the stop.
+    public void Panic()
+    {
+        Reset();
+        suppressUntilMs = Now() + PanicSuppressMs;
+    }
+
     /// Clear all state (so the next session's first dispatch always sends) and
-    /// stop everything. Session end / panic control.
+    /// stop everything. Session end teardown — no suppression window, so
+    /// joining the next world starts clean and responsive.
     public void Reset()
     {
+        suppressUntilMs = 0;
         lastFireMs.Clear();
         lastScale.Clear();
+        lastObserved.Clear();
         holdUntilMs.Clear();
         pendingReassert.Clear();
         lastAnyFireMs = 0;

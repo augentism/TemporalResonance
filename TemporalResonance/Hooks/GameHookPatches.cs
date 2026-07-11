@@ -1,3 +1,4 @@
+using System;
 using HarmonyLib;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -145,9 +146,19 @@ public static class GameHookPatches
         var bear = AnimManagerEntity(__instance);
         var playerPos = capi.World?.Player?.Entity?.Pos;
         if (bear?.World?.Side != EnumAppSide.Client || playerPos == null) return;
-        if (bear.Pos.DistanceTo(playerPos.XYZ) > sound!.Attributes.Range) return;
 
-        capi.Event.EnqueueMainThreadTask(() => dispatcher.Dispatch(BearFootstepHookId), "temporalresonance");
+        var range = sound!.Attributes.Range;
+        var distance = bear.Pos.DistanceTo(playerPos.XYZ);
+        if (distance > range || range <= 0) return;
+
+        // Perceived loudness: the sound's base volume attenuated linearly to
+        // ~zero at its range (the game fades to 1% there). A bear stepping
+        // next to you hits full intensity; at the edge of earshot, a whisper.
+        var volume = sound.Attributes.Volume?.avg ?? 1f;
+        var loudness = Math.Clamp(volume * (1f - (float)(distance / range)), 0f, 1f);
+        if (loudness <= 0) return;
+
+        capi.Event.EnqueueMainThreadTask(() => dispatcher.Dispatch(BearFootstepHookId, loudness), "temporalresonance");
     }
 
     static bool lastStormActive;

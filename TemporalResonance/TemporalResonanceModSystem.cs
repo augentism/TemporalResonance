@@ -49,8 +49,8 @@ public class TemporalResonanceModSystem : ModSystem
             GlKeys.P, HotkeyType.GUIOrOtherControls);
         api.Input.SetHotKeyHandler("temporalresonancepanic", _ =>
         {
-            dispatcher.Reset();
-            api.ShowChatMessage("[TemporalResonance] Panic: all devices stopped, dispatcher reset.");
+            dispatcher.Panic();
+            api.ShowChatMessage("[TemporalResonance] Panic: all devices stopped, triggers suppressed for 20s.");
             return true;
         });
 

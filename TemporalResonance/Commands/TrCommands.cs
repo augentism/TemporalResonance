@@ -114,11 +114,11 @@ public class TrCommands
             }))
         .EndSubCommand()
         .BeginSubCommand("panic")
-            .WithDescription("Stop everything and reset all dispatcher state")
+            .WithDescription("Stop everything, reset dispatcher state, suppress triggers for 20s")
             .HandleWith(_ =>
             {
-                dispatcher.Reset();
-                return TextCommandResult.Success("Panic: all devices stopped, dispatcher reset.");
+                dispatcher.Panic();
+                return TextCommandResult.Success("Panic: all devices stopped, triggers suppressed for 20s.");
             })
         .EndSubCommand()
         .BeginSubCommand("gui")
