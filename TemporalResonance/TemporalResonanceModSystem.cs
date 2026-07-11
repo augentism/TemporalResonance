@@ -63,6 +63,7 @@ public class TemporalResonanceModSystem : ModSystem
 
         // Hardware doesn't stop on its own — silence everything when the session ends.
         api.Event.LeaveWorld += dispatcher.Reset;
+        api.Event.LeaveWorld += GameHookPatches.ResetStormState;
 
         if (store.Config.AutoConnect)
             devices.RunAsync(() => devices.ConnectAsync(store.Config.ServerUrl), "connect");
@@ -149,6 +150,14 @@ public class TemporalResonanceModSystem : ModSystem
             DisplayName = "Bear footsteps nearby",
             Kind = HookKind.Event,
             CooldownSec = 0.4
+        });
+
+        hooks.Register(new HookDescriptor
+        {
+            Id = GameHookPatches.TemporalStormHookId,
+            DisplayName = "Temporal storm started",
+            Kind = HookKind.Event,
+            CooldownSec = 10
         });
 
         hooks.Register(new HookDescriptor

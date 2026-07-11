@@ -23,6 +23,7 @@ public static class GameHookPatches
     public const string AteMealHookId = "ate-meal";
     public const string DrankHookId = "drank";
     public const string BearFootstepHookId = "bear-footstep";
+    public const string TemporalStormHookId = "temporal-storm-start";
 
     // Set by the ModSystem before patching; cleared on dispose.
     public static ICoreClientAPI? Capi;
@@ -147,5 +148,29 @@ public static class GameHookPatches
         if (bear.Pos.DistanceTo(playerPos.XYZ) > sound!.Attributes.Range) return;
 
         capi.Event.EnqueueMainThreadTask(() => dispatcher.Dispatch(BearFootstepHookId), "temporalresonance");
+    }
+
+    static bool lastStormActive;
+
+    /// Reset transition state on world join/leave so a storm already raging
+    /// when the player joins fires the hook once.
+    public static void ResetStormState() => lastStormActive = false;
+
+    // The server pushes TemporalStormRunTimeData to the client via this
+    // private handler; nowStormActive flipping false -> true is storm start.
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(SystemTemporalStability), "onServerData")]
+    public static void OnStormData(TemporalStormRunTimeData data)
+    {
+        var capi = Capi;
+        var dispatcher = Dispatcher;
+        if (capi == null || dispatcher == null || data == null) return;
+
+        var wasActive = lastStormActive;
+        lastStormActive = data.nowStormActive;
+        if (data.nowStormActive && !wasActive)
+        {
+            capi.Event.EnqueueMainThreadTask(() => dispatcher.Dispatch(TemporalStormHookId), "temporalresonance");
+        }
     }
 }
