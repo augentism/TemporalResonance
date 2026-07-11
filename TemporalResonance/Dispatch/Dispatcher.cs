@@ -54,8 +54,7 @@ public class Dispatcher
         if (lastFireMs.TryGetValue(hookId, out var last) && (now - last) < hook.CooldownSec * 1000) return;
 
         // 2. Global minimum gap — POLLS ONLY. Events are rare, cooldown-protected,
-        //    and dropping one loses it forever (the "overload always fired right
-        //    after a 100% poll tick" bug).
+        //    and dropping one loses it forever
         if (isPoll && now - lastAnyFireMs < GlobalMinGapMs) return;
 
         // 3. Change epsilon — POLLS ONLY; bypassed while this hook owes a

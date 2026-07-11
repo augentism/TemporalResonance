@@ -239,9 +239,21 @@ public class TrCommands
         .BeginSubCommand("unassign")
             .WithDescription(".tr unassign <hookid> <devicekey>")
             .WithArgs(parsers.Word("hookid"), parsers.Word("devicekey"))
-            .HandleWith(args => store.Unassign((string)args[0], (string)args[1])
-                ? TextCommandResult.Success($"Unassigned {args[1]} from {args[0]}.")
-                : TextCommandResult.Error("No such assignment."))
+            .HandleWith(args =>
+            {
+                var hookId = (string)args[0];
+                var deviceKey = (string)args[1];
+                // Silence what this assignment last sent before removing it
+                if (store.AssignmentsFor(hookId).TryGetValue(deviceKey, out var oldPresetId)
+                    && store.GetPreset(oldPresetId) is { } oldPreset
+                    && devices.FindByKey(deviceKey) is { } dev)
+                {
+                    player.Play(dev, oldPreset, 0);
+                }
+                return store.Unassign(hookId, deviceKey)
+                    ? TextCommandResult.Success($"Unassigned {deviceKey} from {hookId}.")
+                    : TextCommandResult.Error("No such assignment.");
+            })
         .EndSubCommand()
         .BeginSubCommand("invert")
             .WithDescription(".tr invert <hookid> <devicekey> <on|off> — poll hooks send 1-scale to this device")

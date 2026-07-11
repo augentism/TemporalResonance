@@ -63,7 +63,7 @@ public class TrGuiDialog : GuiDialog
 
     void Recompose()
     {
-        var hookIds = hooks.All.Select(h => h.Id).OrderBy(id => id).ToArray();
+        var hookIds = hooks.All.Where(h => !h.Hidden).Select(h => h.Id).OrderBy(id => id).ToArray();
         var deviceKeys = devices.Devices.Select(d => d.Key).ToArray();
         var presetIds = store.Config.Presets.Keys.OrderBy(id => id).ToArray();
 
@@ -76,7 +76,7 @@ public class TrGuiDialog : GuiDialog
         var assignedPresetId = selHookId != null && selDeviceKey != null
             && store.AssignmentsFor(selHookId).TryGetValue(selDeviceKey, out var pid) ? pid : null;
 
-        const double w = 480, rowH = 30, gap = 8, labelW = 130;
+        const double w = 640, rowH = 30, gap = 8, labelW = 130;
         double y = 0;
         ElementBounds Row(double width = w, double x = 0, double h = rowH) => ElementBounds.Fixed(x, y, width, h);
 
@@ -188,7 +188,20 @@ public class TrGuiDialog : GuiDialog
     void OnAssignChanged(string presetId)
     {
         if (selHookId == null || selDeviceKey == null) return;
-        if (presetId == "") store.Unassign(selHookId, selDeviceKey);
+        if (presetId == "")
+        {
+            // Silence whatever this assignment last sent before removing it —
+            // the hardware otherwise holds its level until something replaces it.
+            // Re-playing the old preset at scale 0 only touches this preset's
+            // action channels, leaving other hooks on the device alone.
+            if (store.AssignmentsFor(selHookId).TryGetValue(selDeviceKey, out var oldPresetId)
+                && store.GetPreset(oldPresetId) is { } oldPreset
+                && devices.FindByKey(selDeviceKey) is { } dev)
+            {
+                player.Play(dev, oldPreset, 0);
+            }
+            store.Unassign(selHookId, selDeviceKey);
+        }
         else store.Assign(selHookId, selDeviceKey, presetId);
     }
 
@@ -265,14 +278,18 @@ public class TrGuiDialog : GuiDialog
     static void AddDropDown(GuiComposer composer, string[] values, string[] names, string? selected,
                             Action<string> onChanged, ElementBounds bounds, string key, string emptyLabel = "-")
     {
-        if (values.Length == 0)
+        // With no real entries, show an inert placeholder that never fires the
+        // callback. An empty-string VALUE in a real list is legitimate (the
+        // "(none)" unassign entry) and must still fire.
+        var isPlaceholder = values.Length == 0;
+        if (isPlaceholder)
         {
             values = new[] { "" };
             names = new[] { emptyLabel };
         }
         var index = Math.Max(0, Array.IndexOf(values, selected ?? ""));
         composer.AddDropDown(values, names, index,
-            (code, _) => { if (code != "") onChanged(code); }, bounds, key);
+            (code, _) => { if (!isPlaceholder) onChanged(code); }, bounds, key);
     }
 
     string HookLabel(string id)

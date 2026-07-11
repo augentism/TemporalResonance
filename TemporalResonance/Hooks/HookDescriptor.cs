@@ -31,4 +31,8 @@ public class HookDescriptor
     /// Polls only: returns current level 0..1, or null when the source is
     /// unavailable (dead, wrong screen, ...).
     public Func<float?>? Sampler { get; init; }
+
+    /// Hidden from the configuration UI (debug/test hooks). Still fully
+    /// functional via chat commands (.tr hooks / fire / assign).
+    public bool Hidden { get; init; }
 }
