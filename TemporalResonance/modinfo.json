@@ -7,7 +7,7 @@
     "authors": [
         "augentism"
     ],
-    "description": "To be added",
+    "description": "Simple compatibility layer for Intiface Central haptic feedback devices.",
     "version": "0.1.0",
     "dependencies": {
         "game": "1.22.2"
