@@ -108,8 +108,27 @@ public class Dispatcher
                 // 9. Claim holds: timed event bursts own their devices. Plain
                 //    assignment, never Max() — the newest burst physically
                 //    replaced the previous one, so its window must too.
-                if (!isPoll && preset.DurationSec > 0)
-                    holdUntilMs[dev.Key] = now + (long)(preset.DurationSec * 1000);
+                //    The reassert debt is charged HERE for EVERY event send
+                //    (not only at the hold check) — that's load-bearing twice
+                //    over: (a) an unchanged poll is dropped at the epsilon
+                //    gate before it ever discovers a hold, so it would stay
+                //    silent until its value drifted past the epsilon; and
+                //    (b) an infinite-duration event claims no hold, so the
+                //    debt is what lets the poll's very next sample displace it.
+                if (!isPoll)
+                {
+                    if (preset.DurationSec > 0)
+                        holdUntilMs[dev.Key] = now + (long)(preset.DurationSec * 1000);
+
+                    foreach (var pollHook in hooks.All)
+                    {
+                        if (pollHook.Kind == HookKind.Poll && pollHook.Id != hookId
+                            && store.AssignmentsFor(pollHook.Id).ContainsKey(dev.Key))
+                        {
+                            pendingReassert.Add(pollHook.Id);
+                        }
+                    }
+                }
             }
         }
 

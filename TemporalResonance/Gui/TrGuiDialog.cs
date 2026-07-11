@@ -163,10 +163,13 @@ public class TrGuiDialog : GuiDialog
         if (preset != null)
         {
             var intensity = (int)Math.Round((preset.Actions.TryGetValue("vibrate", out var vib) ? vib : 0) * 100);
-            SetupSlider("intensityslider", intensity, 0, 100, "%", v => p => p.Actions["vibrate"] = v / 100.0);
-            SetupSlider("durationslider", (int)Math.Round(preset.DurationSec * 10), 0, 300, " ds (0=∞)", v => p => p.DurationSec = v / 10.0);
-            SetupSlider("looponslider", (int)Math.Round(preset.LoopOnSec * 10), 0, 100, " ds", v => p => p.LoopOnSec = v / 10.0);
-            SetupSlider("loopoffslider", (int)Math.Round(preset.LoopOffSec * 10), 0, 100, " ds", v => p => p.LoopOffSec = v / 10.0);
+            SetupSlider("intensityslider", intensity, 0, 100, v => $"{v}%", v => p => p.Actions["vibrate"] = v / 100.0);
+            SetupSlider("durationslider", (int)Math.Round(preset.DurationSec * 10), 0, 300,
+                v => v == 0 ? "∞" : $"{v / 10.0:0.0}s", v => p => p.DurationSec = v / 10.0);
+            SetupSlider("looponslider", (int)Math.Round(preset.LoopOnSec * 10), 0, 100,
+                v => $"{v / 10.0:0.0}s", v => p => p.LoopOnSec = v / 10.0);
+            SetupSlider("loopoffslider", (int)Math.Round(preset.LoopOffSec * 10), 0, 100,
+                v => $"{v / 10.0:0.0}s", v => p => p.LoopOffSec = v / 10.0);
         }
     }
 
@@ -242,14 +245,19 @@ public class TrGuiDialog : GuiDialog
 
     // ---- helpers ----
 
-    /// Sliders store scaled ints (percent / deciseconds). This API version's
+    /// Sliders store scaled ints (percent / tenths of a second) but display
+    /// through a format callback (e.g. 15 -> "1.5s"). This API version's
     /// slider fires on every drag tick, so edits mutate the preset in memory
     /// and the config is saved once when the dialog closes.
-    void SetupSlider(string key, int value, int min, int max, string unit, System.Func<int, Action<Preset>> edit)
+    void SetupSlider(string key, int value, int min, int max, System.Func<int, string> format, System.Func<int, Action<Preset>> edit)
     {
         var slider = SingleComposer.GetSlider(key);
-        slider.SetValues(value, min, max, 1, unit);
-        slider.OnSliderTooltip = v => $"{v}{unit}";
+        // Callbacks must be in place BEFORE SetValues — it renders the initial
+        // text immediately, and without them that first render shows the raw int.
+        slider.ShowTextWhenResting = true;
+        slider.OnSliderTooltip = v => format(v);
+        slider.OnSliderRestingText = v => format(v);
+        slider.SetValues(value, min, max, 1);
         SliderEdits[key] = v =>
         {
             var preset = selPresetId == null ? null : store.GetPreset(selPresetId);
